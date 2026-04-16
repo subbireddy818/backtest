@@ -75,12 +75,21 @@ def run_backtest(symbol, start_date_str, end_date_str):
                     if current_rsi > 40 or current_rsi < 16 or force_close:
                         pnl = close_price - active_trade['entry_price']
                         
+                        reason = "Unknown"
+                        if force_close:
+                            reason = "EOD Force Close"
+                        elif current_rsi > 40:
+                            reason = "Take Profit (RSI > 40)"
+                        elif current_rsi < 16:
+                            reason = "Stop Loss (RSI < 16)"
+                        
                         trades.append({
                             "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
                             "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
                             "entry_price": active_trade['entry_price'],
                             "exit_price": close_price,
-                            "pnl": round(pnl, 2)
+                            "pnl": round(pnl, 2),
+                            "exit_reason": reason
                         })
                         active_trade = None # Reset state
                         

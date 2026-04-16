@@ -98,11 +98,12 @@ function updateUI(data) {
                 <td>${trade.entry_price.toFixed(2)}</td>
                 <td>${trade.exit_price.toFixed(2)}</td>
                 <td class="${pnlClass}">${sign}${trade.pnl.toFixed(2)}</td>
+                <td style="font-size: 0.85em; opacity: 0.8;">${trade.exit_reason}</td>
             `;
             tbody.appendChild(tr);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No trades executed in this period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No trades executed in this period.</td></tr>';
     }
 }
 
