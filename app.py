@@ -6,7 +6,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-def run_backtest(symbol, entry_time_str, exit_time_str, start_date_str, end_date_str):
+def run_backtest(symbol, start_date_str, end_date_str):
     try:
         # yfinance uses 'YYYY-MM-DD' format, so we need to ensure formatting
         start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
@@ -35,38 +35,55 @@ def run_backtest(symbol, entry_time_str, exit_time_str, start_date_str, end_date
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
             
-        days = df.groupby(df.index.date)
+        # Calculate wilder's RSI (14)
+        delta = df['Close'].diff()
+        gain = delta.clip(lower=0)
+        loss = -1 * delta.clip(upper=0)
+        avg_gain = gain.ewm(com=13, adjust=False).mean()
+        avg_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        df['RSI'] = 100 - (100 / (1 + rs))
         
         trades = []
+        active_trade = None
         
-        for date, day_data in days:
-            # Parse target times
-            entry_time = datetime.strptime(f"{date} {entry_time_str}", "%Y-%m-%d %H:%M")
-            exit_time = datetime.strptime(f"{date} {exit_time_str}", "%Y-%m-%d %H:%M")
+        for idx, row in df.iterrows():
+            if pd.isna(row['RSI']):
+                continue
+                
+            close_price = round(float(row['Close']), 2)
+            current_rsi = float(row['RSI'])
             
-            # Windows
-            entry_window_end = entry_time + pd.Timedelta(minutes=5)
-            exit_window_end = exit_time + pd.Timedelta(minutes=5)
+            # Intraday limits: no new trades after 15:15 to avoid overnight risk
+            allowed_entry = idx.hour < 15 or (idx.hour == 15 and idx.minute <= 15)
+            # Force close close parameter (end of day 15:30 limit check)
+            force_close = idx.hour == 15 and idx.minute >= 28
             
-            entry_candle = day_data[(day_data.index >= entry_time) & (day_data.index < entry_window_end)].head(1)
-            exit_candle = day_data[(day_data.index >= exit_time) & (day_data.index < exit_window_end)].head(1)
-            
-            if not entry_candle.empty and not exit_candle.empty:
-                try:
-                    entry_price = float(entry_candle['Close'].iloc[0])
-                    exit_price = float(exit_candle['Close'].iloc[0])
-                    
-                    pnl = exit_price - entry_price
-                    
-                    trades.append({
-                        "date": str(date),
-                        "entry": round(entry_price, 2),
-                        "exit": round(exit_price, 2),
-                        "pnl": round(pnl, 2)
-                    })
-                except Exception as e:
-                    print(f"Error extracting prices for {date}: {e}")
-                    
+            if active_trade is None:
+                # ENTRY CONDITION: RSI < 30
+                if current_rsi < 30 and allowed_entry:
+                    active_trade = {
+                        "entry_time": idx,
+                        "entry_price": close_price
+                    }
+            else:
+                # We are IN a trade, check hold duration
+                hold_minutes = (idx - active_trade['entry_time']).total_seconds() / 60
+                
+                # Check exit conditions (after 5 minute holding period)
+                if hold_minutes >= 5:
+                    if current_rsi > 40 or current_rsi < 16 or force_close:
+                        pnl = close_price - active_trade['entry_price']
+                        
+                        trades.append({
+                            "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
+                            "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
+                            "entry_price": active_trade['entry_price'],
+                            "exit_price": close_price,
+                            "pnl": round(pnl, 2)
+                        })
+                        active_trade = None # Reset state
+                        
         total_pnl = sum(t['pnl'] for t in trades)
         wins = [t for t in trades if t['pnl'] > 0]
         win_rate = (len(wins) / len(trades) * 100) if trades else 0
@@ -80,7 +97,6 @@ def run_backtest(symbol, entry_time_str, exit_time_str, start_date_str, end_date
         }
     except Exception as e:
         return {"error": str(e)}
-
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -89,15 +105,13 @@ def index():
 def backtest_endpoint():
     data = request.json
     symbol = data.get("symbol")
-    entry_time = data.get("entry_time")
-    exit_time = data.get("exit_time")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
     
-    if not all([symbol, entry_time, exit_time, start_date, end_date]):
+    if not all([symbol, start_date, end_date]):
         return jsonify({"error": "Missing input parameters"}), 400
         
-    result = run_backtest(symbol, entry_time, exit_time, start_date, end_date)
+    result = run_backtest(symbol, start_date, end_date)
     
     return jsonify(result)
 

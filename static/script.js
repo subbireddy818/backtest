@@ -37,11 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.textContent = 'Processing...';
         loader.classList.remove('hidden');
         
-        // Gather data
         const payload = {
             symbol: document.getElementById('symbol').value,
-            entry_time: document.getElementById('entry_time').value,
-            exit_time: document.getElementById('exit_time').value,
             start_date: startDateInput.value,
             end_date: endDateInput.value
         };
@@ -96,15 +93,16 @@ function updateUI(data) {
             const sign = trade.pnl >= 0 ? '+' : '';
             
             tr.innerHTML = `
-                <td>${trade.date}</td>
-                <td>${trade.entry.toFixed(2)}</td>
-                <td>${trade.exit.toFixed(2)}</td>
+                <td>${trade.entry_time}</td>
+                <td>${trade.exit_time}</td>
+                <td>${trade.entry_price.toFixed(2)}</td>
+                <td>${trade.exit_price.toFixed(2)}</td>
                 <td class="${pnlClass}">${sign}${trade.pnl.toFixed(2)}</td>
             `;
             tbody.appendChild(tr);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No trades executed in this period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No trades executed in this period.</td></tr>';
     }
 }
 
