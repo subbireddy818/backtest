@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Algo Backtesting Engine</title>
+    <meta name="description" content="Professional algorithmic backtesting engine powered by Yahoo Finance data.">
+    <!-- Google Fonts for Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>AlgoTrader <span class="badge">PRO</span></h1>
+            <p>Backtest Time-Based Strategies Instantly</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Sidebar Controls -->
+            <section class="controls-section glass-panel">
+                <h2>Strategy Configuration</h2>
+                
+                <form id="backtestForm">
+                    <div class="form-group">
+                        <label for="symbol">Instrument Symbol (Yahoo Finance)</label>
+                        <select id="symbol" name="symbol" required>
+                            <option value="^NSEI">Nifty 50 (^NSEI)</option>
+                            <option value="RELIANCE.NS">Reliance (RELIANCE.NS)</option>
+                            <option value="HDFCBANK.NS">HDFC Bank (HDFCBANK.NS)</option>
+                            <option value="TCS.NS">TCS (TCS.NS)</option>
+                            <option value="AAPL">Apple (AAPL)</option>
+                        </select>
+                    </div>
+
+                    <div class="time-group">
+                        <div class="form-group">
+                            <label for="entry_time">Entry Time (HH:MM)</label>
+                            <input type="time" id="entry_time" name="entry_time" value="09:30" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="exit_time">Exit Time (HH:MM)</label>
+                            <input type="time" id="exit_time" name="exit_time" value="11:30" required>
+                        </div>
+                    </div>
+
+                    <div class="date-group">
+                        <div class="form-group">
+                            <label for="start_date">Start Date (Last 7 Days)</label>
+                            <input type="date" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end_date">End Date</label>
+                            <input type="date" id="end_date" name="end_date" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="runBtn" class="btn-primary">
+                        <span id="btnText">Run Backtest</span>
+                        <div id="loader" class="spinner hidden"></div>
+                    </button>
+                    <p class="helper-text">* 1-minute historical data runs are limited to a 7-day window by data provider.</p>
+                </form>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section">
+                <!-- Summary Cards -->
+                <div class="summary-cards">
+                    <div class="card glass-panel">
+                        <h3>Total PnL</h3>
+                        <p class="val" id="val-pnl">--</p>
+                    </div>
+                    <div class="card glass-panel">
+                        <h3>Win Rate</h3>
+                        <p class="val" id="val-winrate">--</p>
+                    </div>
+                    <div class="card glass-panel">
+                        <h3>Total Trades</h3>
+                        <p class="val" id="val-trades">--</p>
+                    </div>
+                </div>
+
+                <!-- Trades Table -->
+                <div class="table-container glass-panel">
+                    <h3>Trade Log</h3>
+                    <div id="output">
+                        <table id="tradesTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Entry Price</th>
+                                    <th>Exit Price</th>
+                                    <th>PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tradesBody">
+                                <!-- Populated dynamically by JS -->
+                                <tr>
+                                    <td colspan="4" class="empty-state">Run a backtest to see results here.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Error Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
