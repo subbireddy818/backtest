@@ -13,7 +13,7 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <h1>AlgoTrader <span class="badge">PRO</span></h1>
+            <h1>AlgoTrader</h1>
             <p>Backtest Time-Based Strategies Instantly</p>
         </header>
 
@@ -24,9 +24,19 @@
                 
                 <form id="backtestForm">
                     <div class="form-group">
+                        <label for="strategy">Select Strategy</label>
+                        <select id="strategy" name="strategy" required>
+                            <option value="strategy1">Strategy 1 (Existing)</option>
+                            <option value="strategy2">Strategy 2 (RSI Drop)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
                         <label for="symbol">Instrument Symbol (Yahoo Finance)</label>
                         <select id="symbol" name="symbol" required>
                             <option value="^NSEI">Nifty 50 (^NSEI)</option>
+                            <option value="^NSEBANK">Bank Nifty (^NSEBANK)</option>
+                            <option value="^BSESN">Sensex (^BSESN)</option>
                             <option value="RELIANCE.NS">Reliance (RELIANCE.NS)</option>
                             <option value="HDFCBANK.NS">HDFC Bank (HDFCBANK.NS)</option>
                             <option value="TCS.NS">TCS (TCS.NS)</option>
@@ -81,16 +91,19 @@
                                 <tr>
                                     <th>Entry Time</th>
                                     <th>Exit Time</th>
+                                    <th>Signal</th>
                                     <th>Entry Price</th>
                                     <th>Exit Price</th>
+                                    <th>RSI (In/Out)</th>
+                                    <th>Duration</th>
                                     <th>PnL</th>
-                                    <th style="width: 25%;">Reason for Exit</th>
+                                    <th style="width: 20%;">Reason</th>
                                 </tr>
                             </thead>
                             <tbody id="tradesBody">
                                 <!-- Populated dynamically by JS -->
                                 <tr>
-                                    <td colspan="4" class="empty-state">Run a backtest to see results here.</td>
+                                    <td colspan="9" class="empty-state">Please configure the strategy and run a backtest to see live trade results here.</td>
                                 </tr>
                             </tbody>
                         </table>

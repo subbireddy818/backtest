@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loader.classList.remove('hidden');
         
         const payload = {
+            strategy: document.getElementById('strategy').value,
             symbol: document.getElementById('symbol').value,
             start_date: startDateInput.value,
             end_date: endDateInput.value
@@ -92,18 +93,24 @@ function updateUI(data) {
             const pnlClass = trade.pnl >= 0 ? 'text-profit' : 'text-loss';
             const sign = trade.pnl >= 0 ? '+' : '';
             
+            const strongBadge = trade.strong_entry ? '<span class="badge-strong">Strong</span>' : '<span class="badge-reg">Reg</span>';
+            const rsiInfo = trade.entry_rsi ? `${trade.entry_rsi} / ${trade.exit_rsi}` : '--';
+            
             tr.innerHTML = `
                 <td>${trade.entry_time}</td>
                 <td>${trade.exit_time}</td>
+                <td>${trade.entry_rsi ? strongBadge : '--'}</td>
                 <td>${trade.entry_price.toFixed(2)}</td>
                 <td>${trade.exit_price.toFixed(2)}</td>
+                <td>${rsiInfo}</td>
+                <td style="font-family: monospace;">${trade.duration_formatted || '--'}</td>
                 <td class="${pnlClass}">${sign}${trade.pnl.toFixed(2)}</td>
                 <td style="font-size: 0.85em; opacity: 0.8;">${trade.exit_reason}</td>
             `;
             tbody.appendChild(tr);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No trades executed in this period.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No trades executed in this period.</td></tr>';
     }
 }
 

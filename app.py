@@ -6,7 +6,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-def run_backtest(symbol, start_date_str, end_date_str):
+def run_backtest(strategy, symbol, start_date_str, end_date_str):
     try:
         # yfinance uses 'YYYY-MM-DD' format, so we need to ensure formatting
         start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
@@ -44,58 +44,132 @@ def run_backtest(symbol, start_date_str, end_date_str):
         rs = avg_gain / avg_loss
         df['RSI'] = 100 - (100 / (1 + rs))
         
-        trades = []
-        active_trade = None
+        # Ensure sorting and remove timezone for Strategy 2 compatibility
+        df = df.sort_index()
+        df.index = df.index.tz_localize(None) if df.index.tz else df.index
         
-        for idx, row in df.iterrows():
-            if pd.isna(row['RSI']):
-                continue
-                
-            close_price = round(float(row['Close']), 2)
-            current_rsi = float(row['RSI'])
+        trades = []
+        if strategy == "strategy2":
+            # --- STRATEGY 2: RSI DROP PRODUCTION LOGIC ---
+            state = "RESET_WAITING"
+            in_trade = False
+            active_trade = None
             
-            # Intraday limits: no new trades after 15:15 to avoid overnight risk
-            allowed_entry = idx.hour < 15 or (idx.hour == 15 and idx.minute <= 15)
-            # Force close close parameter (end of day 15:30 limit check)
-            force_close = idx.hour == 15 and idx.minute >= 28
-            
-            if active_trade is None:
-                # ENTRY CONDITION: RSI < 30
-                if current_rsi < 30 and allowed_entry:
-                    active_trade = {
-                        "entry_time": idx,
-                        "entry_price": close_price
-                    }
-            else:
-                # We are IN a trade, check hold duration
-                hold_minutes = (idx - active_trade['entry_time']).total_seconds() / 60
+            for i in range(1, len(df)):
+                row = df.iloc[i]
+                prev_row = df.iloc[i-1]
                 
-                # Check exit conditions (after 5 minute holding period)
-                if hold_minutes >= 5:
-                    if current_rsi > 40 or current_rsi < 16 or force_close:
-                        pnl = close_price - active_trade['entry_price']
+                if pd.isna(row['RSI']) or pd.isna(prev_row['RSI']):
+                    continue
+                
+                curr_rsi = float(row['RSI'])
+                prev_rsi = float(prev_row['RSI'])
+                curr_close = round(float(row['Close']), 2)
+                curr_time = df.index[i]
+                
+                # STATE: RESET_WAITING (Wait for RSI cross above 40)
+                if state == "RESET_WAITING":
+                    if prev_rsi < 40 and curr_rsi > 40:
+                        state = "READY_TO_ENTER"
+                
+                # STATE: READY_TO_ENTER (Wait for RSI cross below 30)
+                elif state == "READY_TO_ENTER":
+                    if not in_trade and prev_rsi > 30 and curr_rsi < 30:
+                        active_trade = {
+                            "entry_time": curr_time,
+                            "entry_price": curr_close,
+                            "entry_rsi": curr_rsi,
+                            "strong_entry": curr_rsi < 20
+                        }
+                        in_trade = True
+                        state = "IN_TRADE"
+                        continue # Skip same-candle exit
+                
+                # STATE: IN_TRADE (Handle exit)
+                elif state == "IN_TRADE" and in_trade:
+                    # Multi-day Carry Prevention
+                    if curr_time.date() != active_trade['entry_time'].date():
+                        in_trade = False
+                        state = "RESET_WAITING"
+                        active_trade = None
+                        continue
+
+                    hold_seconds = (curr_time - active_trade['entry_time']).total_seconds()
+                    
+                    # No exit allowed before 5 minutes
+                    if hold_seconds < 300:
+                        continue
                         
-                        reason = "Unknown"
-                        if force_close:
-                            reason = "EOD Force Close"
-                        elif current_rsi > 40:
-                            reason = "Take Profit (RSI > 40)"
-                        elif current_rsi < 16:
-                            reason = "Stop Loss (RSI < 16)"
+                    exit_triggered = False
+                    exit_reason = ""
+                    
+                    # PRIORITY 1: STOP LOSS (RSI < 16)
+                    if curr_rsi < 16:
+                        exit_triggered = True
+                        exit_reason = "Stop Loss (RSI < 16)"
+                    # PRIORITY 2: TAKE PROFIT (RSI cross above 40)
+                    elif prev_rsi < 40 and curr_rsi > 40:
+                        exit_triggered = True
+                        exit_reason = "Take Profit (RSI > 40 Cross)"
+                        
+                    if exit_triggered:
+                        pnl = curr_close - active_trade['entry_price']
+                        # FORMAT DURATION (MM:SS.mmm)
+                        mins = int(hold_seconds // 60)
+                        secs = int(hold_seconds % 60)
+                        millis = int((hold_seconds * 1000) % 1000)
+                        duration_fmt = f"{mins:02}:{secs:02}.{millis:03}"
                         
                         trades.append({
                             "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
-                            "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
+                            "exit_time": curr_time.strftime("%Y-%m-%d %H:%M"),
                             "entry_price": active_trade['entry_price'],
-                            "exit_price": close_price,
+                            "exit_price": curr_close,
+                            "entry_rsi": round(active_trade['entry_rsi'], 2),
+                            "exit_rsi": round(curr_rsi, 2),
+                            "strong_entry": active_trade['strong_entry'],
+                            "exit_reason": exit_reason,
                             "pnl": round(pnl, 2),
-                            "exit_reason": reason
+                            "duration_minutes": round(hold_seconds / 60, 1),
+                            "duration_formatted": duration_fmt
                         })
-                        active_trade = None # Reset state
-                        
+                        # RESET ALL FLAGS
+                        in_trade = False
+                        active_trade = None
+                        state = "RESET_WAITING"
+        else:
+            # --- STRATEGY 1: EXISTING LOGIC ---
+            active_trade = None
+            for idx, row in df.iterrows():
+                if pd.isna(row['RSI']): continue
+                close_price = round(float(row['Close']), 2)
+                current_rsi = float(row['RSI'])
+                
+                allowed_entry = idx.hour < 15 or (idx.hour == 15 and idx.minute <= 15)
+                force_close = idx.hour == 15 and idx.minute >= 28
+                
+                if active_trade is None:
+                    if current_rsi < 30 and allowed_entry:
+                        active_trade = {"entry_time": idx, "entry_price": close_price}
+                else:
+                    hold_minutes = (idx - active_trade['entry_time']).total_seconds() / 60
+                    if hold_minutes >= 5:
+                        if current_rsi > 40 or current_rsi < 16 or force_close:
+                            pnl = close_price - active_trade['entry_price']
+                            reason = "EOD Force Close" if force_close else ("Take Profit" if current_rsi > 40 else "Stop Loss")
+                            trades.append({
+                                "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
+                                "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
+                                "entry_price": active_trade['entry_price'],
+                                "exit_price": close_price,
+                                "pnl": round(pnl, 2),
+                                "exit_reason": reason
+                            })
+                            active_trade = None
+                            
         total_pnl = sum(t['pnl'] for t in trades)
-        wins = [t for t in trades if t['pnl'] > 0]
-        win_rate = (len(wins) / len(trades) * 100) if trades else 0
+        wins = len([t for t in trades if t['pnl'] > 0])
+        win_rate = (wins / len(trades) * 100) if trades else 0
         
         return {
             "success": True,
@@ -113,6 +187,7 @@ def index():
 @app.route("/backtest", methods=["POST"])
 def backtest_endpoint():
     data = request.json
+    strategy = data.get("strategy", "strategy1")
     symbol = data.get("symbol")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
@@ -120,7 +195,7 @@ def backtest_endpoint():
     if not all([symbol, start_date, end_date]):
         return jsonify({"error": "Missing input parameters"}), 400
         
-    result = run_backtest(symbol, start_date, end_date)
+    result = run_backtest(strategy, symbol, start_date, end_date)
     
     return jsonify(result)
 
