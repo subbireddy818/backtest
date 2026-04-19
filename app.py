@@ -6,20 +6,27 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-def run_backtest(strategy, symbol, start_date_str, end_date_str):
+def run_backtest(strategy, symbol, start_date_str, end_date_str, interval="1m"):
     try:
         # yfinance uses 'YYYY-MM-DD' format, so we need to ensure formatting
         start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
         end_dt = datetime.strptime(end_date_str, "%Y-%m-%d")
         
-        # Format for yfinance
-        yf_start = start_dt.strftime("%Y-%m-%d")
+        # Buffer calculations for RSI warm-up
+        # 1m data is limit to 7 days, 5m data is limited to 60 days.
+        buffer_days = 5
+        if interval == "1m":
+            days_since_start = (datetime.now() - start_dt).days
+            buffer_days = min(2, max(0, 6 - days_since_start))
+        
+        fetch_start_dt = start_dt - pd.Timedelta(days=buffer_days)
+        yf_start = fetch_start_dt.strftime("%Y-%m-%d")
         # Add one day to end_date because yfinance end date is exclusive
         yf_end = (end_dt + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
         
         # Fetch data
-        print(f"Fetching data for {symbol} from {yf_start} to {yf_end}")
-        data = yf.download(symbol, start=yf_start, end=yf_end, interval="1m", progress=False)
+        print(f"Fetching data buffer starting from {yf_start} for RSI warmup")
+        data = yf.download(symbol, start=yf_start, end=yf_end, interval=interval, progress=False)
         
         if data.empty:
             return {"error": "No data found for the given dates and symbol. Note: 1-minute data is only available for the last 7 days."}
@@ -120,19 +127,20 @@ def run_backtest(strategy, symbol, start_date_str, end_date_str):
                         millis = int((hold_seconds * 1000) % 1000)
                         duration_fmt = f"{mins:02}:{secs:02}.{millis:03}"
                         
-                        trades.append({
-                            "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
-                            "exit_time": curr_time.strftime("%Y-%m-%d %H:%M"),
-                            "entry_price": active_trade['entry_price'],
-                            "exit_price": curr_close,
-                            "entry_rsi": round(active_trade['entry_rsi'], 2),
-                            "exit_rsi": round(curr_rsi, 2),
-                            "strong_entry": active_trade['strong_entry'],
-                            "exit_reason": exit_reason,
-                            "pnl": round(pnl, 2),
-                            "duration_minutes": round(hold_seconds / 60, 1),
-                            "duration_formatted": duration_fmt
-                        })
+                        # ONLY RECORD TRADES THAT STARTED AFTER USER START DATE
+                        if active_trade['entry_time'] >= start_dt:
+                            trades.append({
+                                "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
+                                "exit_time": curr_time.strftime("%Y-%m-%d %H:%M"),
+                                "entry_price": active_trade['entry_price'],
+                                "exit_price": curr_close,
+                                "pnl": round(pnl, 2),
+                                "exit_reason": exit_reason,
+                                "entry_rsi": round(active_trade['entry_rsi'], 2),
+                                "exit_rsi": round(curr_rsi, 2),
+                                "strong_entry": active_trade['strong_entry'],
+                                "duration_formatted": duration_fmt
+                            })
                         # RESET ALL FLAGS
                         in_trade = False
                         active_trade = None
@@ -157,14 +165,17 @@ def run_backtest(strategy, symbol, start_date_str, end_date_str):
                         if current_rsi > 40 or current_rsi < 16 or force_close:
                             pnl = close_price - active_trade['entry_price']
                             reason = "EOD Force Close" if force_close else ("Take Profit" if current_rsi > 40 else "Stop Loss")
-                            trades.append({
-                                "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
-                                "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
-                                "entry_price": active_trade['entry_price'],
-                                "exit_price": close_price,
-                                "pnl": round(pnl, 2),
-                                "exit_reason": reason
-                            })
+                            
+                            # ONLY RECORD TRADES THAT STARTED AFTER USER START DATE
+                            if active_trade['entry_time'] >= start_dt:
+                                trades.append({
+                                    "entry_time": active_trade['entry_time'].strftime("%Y-%m-%d %H:%M"),
+                                    "exit_time": idx.strftime("%Y-%m-%d %H:%M"),
+                                    "entry_price": active_trade['entry_price'],
+                                    "exit_price": close_price,
+                                    "pnl": round(pnl, 2),
+                                    "exit_reason": reason
+                                })
                             active_trade = None
                             
         total_pnl = sum(t['pnl'] for t in trades)
@@ -191,11 +202,12 @@ def backtest_endpoint():
     symbol = data.get("symbol")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
+    interval = data.get("interval", "1m")
     
     if not all([symbol, start_date, end_date]):
         return jsonify({"error": "Missing input parameters"}), 400
         
-    result = run_backtest(strategy, symbol, start_date, end_date)
+    result = run_backtest(strategy, symbol, start_date, end_date, interval)
     
     return jsonify(result)
 

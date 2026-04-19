@@ -1,120 +1,228 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="dark" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Algo Backtesting Engine</title>
-    <meta name="description" content="Professional algorithmic backtesting engine powered by Yahoo Finance data.">
-    <!-- Google Fonts for Modern Typography -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>AlgoTrader - Institutional Backtesting Engine</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0e0e0e;
+            color: #e5e2e1;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        .data-font { font-family: 'Space Grotesk', monospace; }
+        .headline-font { font-family: 'Manrope', sans-serif; }
+        .glass {
+            background: rgba(53, 53, 52, 0.6);
+            backdrop-filter: blur(20px);
+        }
+        /* High-Visibility Custom scrollbar */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #3de530; border-radius: 5px; border: 2px solid #131313; }
+        ::-webkit-scrollbar-thumb:hover { background: #00c805; }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #3de530;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+
+        .text-profit { color: #3de530 !important; }
+        .text-loss { color: #ffb4aa !important; }
+
+        /* Hide native date picker icon to avoid confusion */
+        input::-webkit-calendar-picker-indicator {
+            display: none;
+            -webkit-appearance: none;
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-highest": "#353534",
+                      "on-surface": "#e5e2e1",
+                      "primary-fixed": "#77ff62",
+                      "surface-container-high": "#2a2a2a",
+                      "surface-container": "#201f1f",
+                      "secondary": "#ffb4aa",
+                      "primary": "#3de530",
+                      "surface-container-lowest": "#0e0e0e",
+                      "primary-container": "#00c805",
+                      "surface-dim": "#131313",
+                      "on-secondary-container": "#ffd2cc",
+                      "background": "#131313",
+                      "surface": "#131313",
+                      "on-primary-container": "#004c00",
+                      "on-primary": "#003a00",
+                      "surface-bright": "#393939",
+                      "surface-variant": "#353534",
+                      "surface-container-low": "#1c1b1b"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              }
+            }
+          }
+        }
+    </script>
 </head>
-<body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <h1>AlgoTrader</h1>
-            <p>Backtest Time-Based Strategies Instantly</p>
+<body class="flex flex-col lg:flex-row min-h-screen bg-surface-container-lowest text-on-surface">
+    <!-- Sidebar: The Kinetic Vault / Parameters Panel -->
+    <aside class="w-full lg:w-72 bg-surface-container relative lg:fixed lg:left-0 lg:top-0 h-auto lg:h-screen z-40 flex flex-col border-b lg:border-b-0 lg:border-r border-outline/10 shadow-2xl shadow-black/40">
+        <div class="px-8 py-6">
+            <h1 class="text-lg font-black font-headline text-primary tracking-tight">AlgoTrader</h1>
+            <p class="text-[10px] text-on-surface/50 tracking-[0.2em] uppercase mt-1">Institutional Precision</p>
+        </div>
+        <nav class="flex-1 px-4 space-y-1">
+            <div class="px-4 py-2 mt-4">
+                <span class="text-[11px] font-bold text-on-surface/40 tracking-widest uppercase">Parameters</span>
+            </div>
+            
+            <!-- Strategy Selection -->
+            <div class="p-4 space-y-3">
+                <label class="block text-xs font-semibold text-on-surface/70">Strategy Selection</label>
+                <div class="relative">
+                    <select id="strategySelect" class="w-full bg-surface-container-lowest border-none text-sm p-3 rounded-lg appearance-none focus:ring-1 focus:ring-primary/30 transition-all cursor-pointer">
+                        <option value="strategy2">RSI Drop (State Machine)</option>
+                        <option value="strategy1">Time-Based Trend</option>
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-3 text-on-surface/40 pointer-events-none">expand_more</span>
+                </div>
+            </div>
+
+            <!-- Instrument Selection -->
+            <div class="p-4 space-y-3">
+                <label class="block text-xs font-semibold text-on-surface/70">Instrument Selection</label>
+                <div class="relative">
+                    <select id="symbolInput" class="w-full bg-surface-container-lowest border-none text-sm p-3 rounded-lg appearance-none focus:ring-1 focus:ring-primary/30 transition-all cursor-pointer">
+                        <option value="^NSEI">Nifty 50 (^NSEI)</option>
+                        <option value="^NSEBANK">Bank Nifty (^NSEBANK)</option>
+                        <option value="^BSESN">Sensex (^BSESN)</option>
+                        <option value="RELIANCE.NS">Reliance (RELIANCE.NS)</option>
+                        <option value="HDFCBANK.NS">HDFC Bank (HDFCBANK.NS)</option>
+                        <option value="TCS.NS">TCS (TCS.NS)</option>
+                        <option value="AAPL">Apple (AAPL)</option>
+                    </select>
+                    <span class="material-symbols-outlined absolute right-3 top-3 text-on-surface/40 pointer-events-none">expand_more</span>
+                </div>
+            </div>
+
+            <!-- Timeframe -->
+            <div class="p-4 space-y-3">
+                <label class="block text-xs font-semibold text-on-surface/70">Timeframe</label>
+                <div class="grid grid-cols-2 gap-1 p-1 bg-surface-container-lowest rounded-lg" id="intervalToggle">
+                    <button data-interval="1m" class="interval-btn text-[10px] py-1.5 rounded hover:bg-surface-container-highest transition-colors">1 min</button>
+                    <button data-interval="5m" class="interval-btn text-[10px] py-1.5 rounded bg-surface-container-highest text-primary font-bold">5 min</button>
+                </div>
+            </div>
+
+            <!-- Date Range -->
+            <div class="p-4 space-y-3">
+                <label class="block text-xs font-semibold text-on-surface/70">Date Range (Warmup: +5 Days)</label>
+                <div class="flex flex-col gap-2">
+                    <div class="relative group">
+                        <input id="startDate" class="w-full bg-surface-container-lowest border-none text-[10px] p-2.5 pr-10 rounded focus:ring-1 focus:ring-primary/30 data-font cursor-pointer" type="date"/>
+                        <span class="material-symbols-outlined absolute right-3 top-2 text-primary opacity-60 group-hover:opacity-100 pointer-events-none text-base transition-opacity">calendar_month</span>
+                    </div>
+                    <div class="relative group">
+                        <input id="endDate" class="w-full bg-surface-container-lowest border-none text-[10px] p-2.5 pr-10 rounded focus:ring-1 focus:ring-primary/30 data-font cursor-pointer" type="date"/>
+                        <span class="material-symbols-outlined absolute right-3 top-2 text-primary opacity-60 group-hover:opacity-100 pointer-events-none text-base transition-opacity">calendar_month</span>
+                    </div>
+                </div>
+                <p class="text-[10px] text-on-surface/30 italic">Click the input or icon to open calendar.</p>
+            </div>
+        </nav>
+
+        <!-- CTA Action -->
+        <div class="p-6 mt-auto">
+            <button id="runBtn" class="w-full py-4 bg-primary-container text-on-primary-container font-bold rounded-lg text-sm tracking-tight flex items-center justify-center gap-2 hover:bg-primary transition-all active:scale-95">
+                <span id="btnIcon" class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+                <span id="btnText">Run Backtest</span>
+                <div id="loader" class="spinner hidden"></div>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="w-full lg:ml-72 flex-1 p-4 lg:p-8 min-h-screen">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10 md:h-16">
+            <h2 class="text-xl lg:text-2xl font-bold font-headline tracking-tight text-on-surface">Execution Analytics</h2>
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container text-xs font-medium border border-outline/5">
+                    <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    Engine: Online
+                </div>
+            </div>
         </header>
 
-        <main class="main-content">
-            <!-- Sidebar Controls -->
-            <section class="controls-section glass-panel">
-                <h2>Strategy Configuration</h2>
-                
-                <form id="backtestForm">
-                    <div class="form-group">
-                        <label for="strategy">Select Strategy</label>
-                        <select id="strategy" name="strategy" required>
-                            <option value="strategy1">Strategy 1 (Existing)</option>
-                            <option value="strategy2">Strategy 2 (RSI Drop)</option>
-                        </select>
-                    </div>
+        <!-- Metrics Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="bg-surface-container p-6 rounded-xl relative overflow-hidden transition-transform hover:-translate-y-1">
+                <div class="text-on-surface/50 text-xs font-semibold mb-2 flex items-center justify-between">Total Trades <span class="material-symbols-outlined text-sm opacity-30">show_chart</span></div>
+                <div id="metric-trades" class="text-3xl font-bold data-font text-on-surface">--</div>
+            </div>
+            <div class="bg-surface-container p-6 rounded-xl relative overflow-hidden transition-transform hover:-translate-y-1">
+                <div class="text-on-surface/50 text-xs font-semibold mb-2 flex items-center justify-between">Total PnL <span class="material-symbols-outlined text-sm opacity-30">account_balance_wallet</span></div>
+                <div id="metric-pnl" class="text-3xl font-bold data-font">--</div>
+            </div>
+            <div class="bg-surface-container p-6 rounded-xl relative overflow-hidden transition-transform hover:-translate-y-1">
+                <div class="text-on-surface/50 text-xs font-semibold mb-2 flex items-center justify-between">Win Rate <span class="material-symbols-outlined text-sm opacity-30">percent</span></div>
+                <div id="metric-winrate" class="text-3xl font-bold data-font text-on-surface">--</div>
+            </div>
+            <div class="bg-surface-container p-6 rounded-xl relative overflow-hidden transition-transform hover:-translate-y-1">
+                <div class="text-on-surface/50 text-xs font-semibold mb-2 flex items-center justify-between">Best Trade <span class="material-symbols-outlined text-sm opacity-30">stars</span></div>
+                <div id="metric-best" class="text-3xl font-bold data-font text-primary">--</div>
+            </div>
+        </section>
 
-                    <div class="form-group">
-                        <label for="symbol">Instrument Symbol (Yahoo Finance)</label>
-                        <select id="symbol" name="symbol" required>
-                            <option value="^NSEI">Nifty 50 (^NSEI)</option>
-                            <option value="^NSEBANK">Bank Nifty (^NSEBANK)</option>
-                            <option value="^BSESN">Sensex (^BSESN)</option>
-                            <option value="RELIANCE.NS">Reliance (RELIANCE.NS)</option>
-                            <option value="HDFCBANK.NS">HDFC Bank (HDFCBANK.NS)</option>
-                            <option value="TCS.NS">TCS (TCS.NS)</option>
-                            <option value="AAPL">Apple (AAPL)</option>
-                        </select>
-                    </div>
+        <!-- Main Workspace: Trade Log -->
+        <section class="bg-surface-container rounded-xl overflow-hidden shadow-xl">
+            <div class="px-8 py-6 flex justify-between items-center border-b border-outline/5 bg-surface-container-high/50">
+                <h3 class="text-sm font-bold tracking-wider text-on-surface/60 uppercase">Execution Log</h3>
+            </div>
+            <div class="overflow-x-auto max-h-[70vh] overflow-y-auto border-t border-outline/5">
+                <table class="w-full text-left border-separate border-spacing-0">
+                    <thead class="sticky top-0 z-10 glass">
+                        <tr class="text-[10px] font-bold text-on-surface/50 uppercase tracking-widest">
+                            <th class="px-8 py-4 border-b border-outline/10">Entry Time</th>
+                            <th class="px-8 py-4 border-b border-outline/10">Exit Time</th>
+                            <th class="px-8 py-4 border-b border-outline/10">Entry/Exit Price</th>
+                            <th class="px-8 py-4 border-b border-outline/10">RSI (I/O)</th>
+                            <th class="px-8 py-4 border-b border-outline/10">Duration</th>
+                            <th class="px-8 py-4 border-b border-outline/10">PnL</th>
+                            <th class="px-8 py-4 border-b border-outline/10">Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradeBody" class="text-xs data-font">
+                        <tr>
+                            <td colspan="7" class="py-20 text-center text-on-surface/30">Run a backtest to see live execution results.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
 
-                    <!-- Time inputs removed for RSI strategy logic -->
-                    <div class="date-group">
-                        <div class="form-group">
-                            <label for="start_date">Start Date (Last 7 Days)</label>
-                            <input type="date" id="start_date" name="start_date" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="end_date">End Date</label>
-                            <input type="date" id="end_date" name="end_date" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="runBtn" class="btn-primary">
-                        <span id="btnText">Run Backtest</span>
-                        <div id="loader" class="spinner hidden"></div>
-                    </button>
-                    <p class="helper-text">* 1-minute historical data runs are limited to a 7-day window by data provider.</p>
-                </form>
-            </section>
-
-            <!-- Results Section -->
-            <section class="results-section">
-                <!-- Summary Cards -->
-                <div class="summary-cards">
-                    <div class="card glass-panel">
-                        <h3>Total PnL</h3>
-                        <p class="val" id="val-pnl">--</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <h3>Win Rate</h3>
-                        <p class="val" id="val-winrate">--</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <h3>Total Trades</h3>
-                        <p class="val" id="val-trades">--</p>
-                    </div>
-                </div>
-
-                <!-- Trades Table -->
-                <div class="table-container glass-panel">
-                    <h3>Trade Log</h3>
-                    <div id="output">
-                        <table id="tradesTable">
-                            <thead>
-                                <tr>
-                                    <th>Entry Time</th>
-                                    <th>Exit Time</th>
-                                    <th>Signal</th>
-                                    <th>Entry Price</th>
-                                    <th>Exit Price</th>
-                                    <th>RSI (In/Out)</th>
-                                    <th>Duration</th>
-                                    <th>PnL</th>
-                                    <th style="width: 20%;">Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tradesBody">
-                                <!-- Populated dynamically by JS -->
-                                <tr>
-                                    <td colspan="9" class="empty-state">Please configure the strategy and run a backtest to see live trade results here.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- Error Toast Notification -->
-    <div id="toast" class="toast hidden"></div>
+    <div id="toast" class="fixed bottom-8 right-8 bg-error text-on-error px-6 py-3 rounded-lg shadow-2xl hidden z-50"></div>
 
     <script src="/static/script.js"></script>
 </body>

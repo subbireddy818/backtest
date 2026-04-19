@@ -256,18 +256,21 @@ input[type="date"], input[type="time"] {
 .text-profit { color: var(--profit); }
 .text-loss { color: var(--loss); }
 
-/* Table */
 .table-container {
-    padding: 2rem;
+    padding: 1.5rem;
+    max-height: 550px; 
+    overflow-y: auto;
     overflow-x: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--accent) transparent;
     border: 1px solid var(--border-color);
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+    position: relative;
 }
 
 /* Custom Scrollbar for Chrome/Safari */
 .table-container::-webkit-scrollbar {
+    width: 6px;
     height: 6px;
 }
 
@@ -297,12 +300,16 @@ table {
 }
 
 th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #151A26; /* Match panel background for sticky header */
     text-align: left;
     padding: 1rem;
     color: var(--text-secondary);
     font-weight: 500;
     border-bottom: 1px solid var(--border-color);
-    white-space: nowrap; /* Prevent headers from wrapping */
+    white-space: nowrap; 
 }
 
 td {
